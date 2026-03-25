@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 网页聊天</title>
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <div class="nav">
+        云端畅聊
+    </div>
+    
+    <!-- 主窗口区 -->
+    <div class="login-container">
+        <div class="login-dialog">
+            <h3>欢迎回来</h3>
+            
+            <div class="row">
+                <span>用户名</span>
+                <input type="text" id="username" placeholder="请输入用户名 / 手机号" autocomplete="username">
+            </div>
+            
+            <div class="row">
+                <span>密码</span>
+                <input type="password" id="password" placeholder="请输入密码" autocomplete="current-password">
+            </div>
+            
+            <div class="button-group">
+                <button id="submit">登 录</button>
+                <button type="button" id="registerBtn" class="register-link">
+                    ✨ 注册账号
+                </button>
+            </div>
+            
+            <div class="extra-links">
+                未注册用户？点击上方按钮立即加入
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入 jquery -->
+    <script src="http://libs.baidu.com/jquery/2.0.0/jquery.min.js"></script>
+    
+    <script>
+        (function() {
+            // DOM 元素
+            const submitButton = document.querySelector('#submit');
+            const registerButton = document.querySelector('#registerBtn');
+            const usernameInput = document.querySelector('#username');
+            const passwordInput = document.querySelector('#password');
+            
+            // 辅助函数：移除输入框的错误样式
+            function removeInputError(inputElement) {
+                if (inputElement) {
+                    inputElement.classList.remove('input-error');
+                }
+            }
+            
+            function addInputError(inputElement) {
+                if (inputElement) {
+                    inputElement.classList.add('input-error');
+                    setTimeout(() => {
+                        removeInputError(inputElement);
+                    }, 500);
+                }
+            }
+            
+            // 登录逻辑
+            if (submitButton) {
+                submitButton.onclick = function() {
+                    let username = usernameInput ? usernameInput.value.trim() : '';
+                    let password = passwordInput ? passwordInput.value : '';
+                    
+                    if (username === '') {
+                        alert('❌ 用户名不能为空，请填写后登录');
+                        if (usernameInput) {
+                            usernameInput.focus();
+                            addInputError(usernameInput);
+                        }
+                        return;
+                    }
+                    if (password === '') {
+                        alert('❌ 密码不能为空，请输入密码');
+                        if (passwordInput) {
+                            passwordInput.focus();
+                            addInputError(passwordInput);
+                        }
+                        return;
+                    }
+                    
+                    submitButton.disabled = true;
+                    const originalText = submitButton.innerText;
+                    submitButton.innerText = '登录中...';
+                    
+                    $.ajax({
+                        url: '/login',
+                        type: 'post',
+                        data: {
+                            username: username,
+                            password: password
+                        },
+                        dataType: 'json',
+                        timeout: 10000,
+                        success: function(body) {
+                            if (body && body.userId && body.userId > 0) {
+                                alert(`🎉 登录成功！欢迎 ${body.username || username} 回来～`);
+                                location.assign('/client.html');
+                            } else {
+                                alert('❌ 登录失败，请检查用户名或密码是否正确');
+                                if (passwordInput) {
+                                    passwordInput.value = '';
+                                    passwordInput.focus();
+                                    addInputError(passwordInput);
+                                }
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('登录请求错误:', status, error);
+                            if (status === 'timeout') {
+                                alert('⏰ 请求超时，请检查网络后重试');
+                            } else {
+                                alert('⚠️ 网络开小差了，请稍后再试');
+                            }
+                        },
+                        complete: function() {
+                            submitButton.disabled = false;
+                            submitButton.innerText = originalText;
+                        }
+                    });
+                };
+            }
+            
+            // 注册跳转
+            if (registerButton) {
+                registerButton.onclick = function() {
+                    registerButton.style.transform = 'scale(0.98)';
+                    setTimeout(() => {
+                        registerButton.style.transform = '';
+                    }, 150);
+                    window.location.href = '/register.html';
+                };
+            }
+            
+            // 回车键提交
+            const handleKeyPress = function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (submitButton && !submitButton.disabled) {
+                        submitButton.click();
+                    }
+                }
+            };
+            
+            if (usernameInput) {
+                usernameInput.addEventListener('keypress', handleKeyPress);
+            }
+            if (passwordInput) {
+                passwordInput.addEventListener('keypress', handleKeyPress);
+            }
+        })();
+    </script>
+</body>
+</html>
