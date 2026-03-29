@@ -13,6 +13,8 @@ insert into user values(1,'zhangsan','123');
 insert into user values(2,'lisi','123');
 insert into user values(3,'wangwu','123');
 insert into user values(4,'zhaoliu','123');
+insert into user values(null,'suntingxuan','123');
+insert into user values(null,'yangguangya','123');
 
 drop table if exists friend;
 
@@ -68,3 +70,13 @@ insert into message values (9, 1, 1, '那你想吃啥?', '2000-05-01 17:08:00');
 insert into message values (10, 2, 1, '随便', '2000-05-01 17:09:00');
 
 insert into message values(7,1,2,'今晚一起约?','2000-05-02 12:00:00');
+
+drop table if exists friend_request;
+create table friend_request(
+    requestId int primary key auto_increment,
+    fromUserId int,
+    toUserId int,
+    status int,
+    createTime datetime,
+    UNIQUE KEY uk_request (fromUserId, toUserId)
+);

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.java_chatroom.model.FriendRequestMapper">
+    <insert id="insertFriendRequest" parameterType="com.example.java_chatroom.model.FriendRequest"
+    useGeneratedKeys="true" keyProperty="requestId">
+        insert into friend_request (fromUserId, toUserId, status, createTime)
+        values(#{fromUserId}, #{toUserId}, #{status}, now())
+    </insert>
+
+    <select id="hasPendingRequest" resultType="int">
+        select count(*) from friend_request
+        where fromUserId = #{fromUserId}
+        and toUserId = #{toUserId}
+        and status = 0
+    </select>
+
+    <update id="updateStatus">
+        update friend_request
+        set status = #{status}
+        where requestId = #{requestId}
+    </update>
+
+    <delete id="deleteRequest">
+        DELETE FROM friend_request
+        WHERE fromUserId = #{fromUserId}
+        AND toUserId = #{toUserId}
+    </delete>
+
+    <select id="getPendingRequests" resultType="com.example.java_chatroom.model.FriendRequest">
+        select * from friend_request
+        where toUserId = #{toUserId}
+        and status = 0
+        ORDER BY createTime DESC
+    </select>
+</mapper>

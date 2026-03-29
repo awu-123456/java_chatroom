@@ -8,4 +8,8 @@
     <insert id="insert" useGeneratedKeys="true" keyProperty="userId">
         insert into user values(null, #{username}, #{password})
     </insert>
+
+    <select id="selectById" resultType="com.example.java_chatroom.model.User">
+        SELECT * FROM user WHERE userId = #{userId}
+    </select>
 </mapper>

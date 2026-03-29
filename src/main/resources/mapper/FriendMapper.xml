@@ -6,4 +6,22 @@
         where userId in
         (select friendId from friend where userId = #{userId})
     </select>
+
+    <select id="selectFriendListBySearchName" resultType="com.example.java_chatroom.model.Friend">
+        select userId as friendId, username as friendName from user
+        where username like concat('%', #{keyword}, '%')
+        and userId != #{currentUserId}
+        and userId not in (
+        select friendId from friend where userId = #{currentUserId})
+    </select>
+
+    <insert id="addFriend">
+        insert into friend (userId, friendId) values(#{userId},#{friendId})
+    </insert>
+
+    <select id="checkIsFriend" resultType="int">
+        SELECT COUNT(*) FROM friend
+        WHERE userId = #{userId}
+        AND friendId = #{friendId}
+    </select>
 </mapper>

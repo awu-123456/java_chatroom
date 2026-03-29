@@ -2,7 +2,7 @@ spring:
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/java_chatroom?characterEncoding=utf8&useSSL=false
     username: root
-    password: "045511"
+    password: "Lyb045511.@"
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 mybatis:

@@ -68,12 +68,10 @@ function initSwitchTab() {
     console.log('标签切换初始化完成');
 }
 
-
 // 确保在 DOM 加载完成后执行
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
         initSwitchTab();
-        // 其他初始化可以在这里调用
     });
 } else {
     initSwitchTab();
@@ -84,7 +82,8 @@ if (document.readyState === 'loading') {
 /////////////////////////////////////////////////////
 
 // 创建 websocket 实例
-let websocket = new WebSocket("ws://127.0.0.1:8080/WebSocketMessage");
+//let websocket = new WebSocket("ws://127.0.0.1:8080/WebSocketMessage");
+let websocket = new WebSocket("ws://" + location.host + "/WebSocketMessage");
 
 websocket.onopen = function() {
     console.log("websocket 连接成功!");
@@ -268,9 +267,17 @@ function getSessionList() {
 getSessionList();
 
 function clickSession(currentLi) {
+    let sessionId = currentLi.getAttribute("message-session-id");
+    
+    // 检查 sessionId 是否存在
+    if (!sessionId) {
+        console.error("sessionId 为空，无法加载历史消息");
+        showToast("会话加载中，请稍后重试");
+        return;
+    }
+    
     let allLis = document.querySelectorAll('#session-list>li');
     activeSession(allLis, currentLi);
-    let sessionId = currentLi.getAttribute("message-session-id");
     getHistoryMessage(sessionId);
 }
 
@@ -331,19 +338,28 @@ function scrollBottom(elem) {
 function clickFriend(friend) {
     let sessionLi = findSessionByName(friend.friendName);
     let sessionListUL = document.querySelector('#session-list');
+    
     if (sessionLi) {
+        // 已有会话，直接切换
         sessionListUL.insertBefore(sessionLi, sessionListUL.children[0]);
         sessionLi.click();
     } else {
+        // 没有会话，先创建会话，等待后端返回 sessionId 后再点击
         sessionLi = document.createElement('li');
         sessionLi.innerHTML = '<h3>' + escapeHtml(friend.friendName) + '</h3>' + '<p></p>';
         sessionListUL.insertBefore(sessionLi, sessionListUL.children[0]);
         sessionLi.onclick = function() {
             clickSession(sessionLi);
         }
-        sessionLi.click();
-        createSession(friend.friendId, sessionLi);
+        
+        // 创建会话，成功后设置 sessionId 并自动点击
+        createSession(friend.friendId, sessionLi, function() {
+            // 会话创建成功后，自动点击这个会话
+            sessionLi.click();
+        });
     }
+    
+    // 切换到会话列表标签页
     let tabSession = document.querySelector('.tab .tab-session');
     if (tabSession) {
         tabSession.click();
@@ -361,16 +377,23 @@ function findSessionByName(username) {
     return null;
 }
 
-function createSession(friendId, sessionLi) {
+function createSession(friendId, sessionLi, callback) {
     $.ajax({
         type: 'post',
         url: 'session?toUserId=' + friendId,
         success: function(body) {
             console.log("会话创建成功! sessionId = " + body.sessionId);
-            sessionLi.setAttribute('message-session-id', body.sessionId);
+            if (body && body.sessionId) {
+                sessionLi.setAttribute('message-session-id', body.sessionId);
+                // 执行回调
+                if (callback) {
+                    callback();
+                }
+            }
         }, 
         error: function() {
             console.log('会话创建失败!');
+            showToast('创建会话失败，请重试');
         }
     });
 }
@@ -470,16 +493,21 @@ function displaySearchResults(users) {
     const currentUserId = document.querySelector('.left .user')?.getAttribute('user-id');
     let html = '';
     for (let user of users) {
-        if (user.userId == currentUserId) {
+        if (!user || !user.friendName) {
             continue;
         }
+        
+        if (user.friendId == currentUserId) {
+            continue;
+        }
+        
         html += `
-            <div class="search-result-item" data-user-id="${user.userId}" data-username="${escapeHtml(user.username)}">
+            <div class="search-result-item" data-user-id="${user.friendId}" data-username="${escapeHtml(user.friendName)}">
                 <div class="user-info">
-                    <div class="avatar">${escapeHtml(user.username.charAt(0).toUpperCase())}</div>
-                    <span class="username">${escapeHtml(user.username)}</span>
+                    <div class="avatar">${escapeHtml(user.friendName.charAt(0).toUpperCase())}</div>
+                    <span class="username">${escapeHtml(user.friendName)}</span>
                 </div>
-                <button class="add-user-btn" onclick="sendAddFriendRequest('${user.userId}', '${escapeHtml(user.username)}')">添加</button>
+                <button class="add-user-btn" onclick="sendAddFriendRequest('${user.friendId}', '${escapeHtml(user.friendName)}')">添加</button>
             </div>
         `;
     }
@@ -523,34 +551,70 @@ function sendAddFriendRequest(toUserId, toUsername) {
     });
 }
 
+// 处理收到的好友请求
 function handleFriendRequest(resp) {
-    const result = confirm(`${resp.fromUsername} 请求添加您为好友，是否同意？`);
-    const response = {
-        type: 'friendRequestResponse',
-        requestId: resp.requestId,
-        fromUserId: resp.fromUserId,
-        fromUsername: resp.fromUsername,
-        agreed: result
-    };
-    websocket.send(JSON.stringify(response));
-    if (result) {
-        showToast(`您已同意添加 ${resp.fromUsername} 为好友`);
-        getFriendList();
-    } else {
-        showToast(`您已拒绝添加 ${resp.fromUsername} 为好友`);
+    try {
+        // 解析 content 里的 requestId（后端把 requestId 放在 content 里）
+        let content = JSON.parse(resp.content);
+        let requestId = content.requestId;
+        let fromUserId = resp.fromId;
+        let fromUsername = resp.fromName;
+        
+        // 弹出确认框
+        let agreed = confirm(fromUsername + " 请求添加您为好友，是否同意？");
+        
+        // 构造响应消息
+        let response = {
+            type: "friendRequestResponse",
+            content: JSON.stringify({
+                requestId: requestId,
+                fromUserId: fromUserId,
+                agreed: agreed ? 1 : 0
+            })
+        };
+        
+        // 发送响应
+        websocket.send(JSON.stringify(response));
+        
+        if (agreed) {
+            showToast("您已同意添加 " + fromUsername + " 为好友");
+            // 刷新好友列表和会话列表
+            setTimeout(function() {
+                getFriendList();
+                getSessionList();
+            }, 500);
+        } else {
+            showToast("您已拒绝添加 " + fromUsername + " 为好友");
+        }
+        
+    } catch (e) {
+        console.error("处理好友请求失败:", e);
     }
 }
 
+// 处理好友请求的响应（对方同意或拒绝后，发送方收到）
 function handleFriendRequestResponse(resp) {
-    if (resp.agreed) {
-        showToast(`${resp.fromUsername} 同意了您的好友请求！`);
-        getFriendList();
-        getSessionList();
-    } else {
-        showToast(`${resp.fromUsername} 拒绝了您的好友请求`);
+    try {
+        // 解析 content
+        let content = JSON.parse(resp.content);
+        let agreed = content.agreed;
+        let fromUsername = resp.fromName;
+        
+        if (agreed == 1) {
+            showToast(fromUsername + " 同意了您的好友请求！");
+            // 刷新好友列表和会话列表
+            getFriendList();
+            getSessionList();
+        } else {
+            showToast(fromUsername + " 拒绝了您的好友请求");
+        }
+        
+    } catch (e) {
+        console.error("处理好友请求响应失败:", e);
     }
 }
 
+// 显示提示消息
 function showToast(message) {
     const existingToast = document.querySelector('.toast');
     if (existingToast) {

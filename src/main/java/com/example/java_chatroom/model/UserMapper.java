@@ -9,4 +9,6 @@ public interface UserMapper {
 
     // 根据用户名查询用户信息 -> 登录
     User selectByName(String username);
+
+    User selectById(Integer userId);
 }
